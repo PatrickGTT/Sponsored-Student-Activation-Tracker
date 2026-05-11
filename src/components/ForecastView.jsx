@@ -1,4 +1,4 @@
-import { ConfidenceBadge, StatusBadge } from './Badge'
+import { StatusBadge } from './Badge'
 import { fmtDate, fmtMoney, parseLocalDate } from '../utils/format'
 
 const WEEK_COUNT = 12
@@ -172,7 +172,6 @@ function ForecastTable({ students, onSelect }) {
               <th className="text-left px-4 py-3">Lifecycle</th>
               <th className="text-left px-4 py-3">Expected Date</th>
               <th className="text-right px-4 py-3">Expected Amount</th>
-              <th className="text-left px-4 py-3">Confidence</th>
               <th className="text-left px-4 py-3">Source</th>
               <th className="text-left px-4 py-3">Reason / Notes</th>
             </tr>
@@ -202,9 +201,6 @@ function ForecastTable({ students, onSelect }) {
                   </td>
                   <td className="px-4 py-3 align-top text-right font-medium text-slate-900">
                     {fmtMoney(f.expectedAmount)}
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    <ConfidenceBadge level={f.confidence} />
                   </td>
                   <td className="px-4 py-3 align-top">
                     {f.isOverridden ? (

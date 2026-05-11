@@ -35,12 +35,6 @@ const LIFECYCLE_BAR_COLOR = {
   'Issue / Escalation': 'bg-red-600',
 }
 
-const RISK_BAR_COLOR = {
-  High: 'bg-red-500',
-  Medium: 'bg-amber-500',
-  Low: 'bg-emerald-500',
-}
-
 export default function LeadershipDashboard({ students }) {
   const total = students.length
   const totalAr = sumAr(students)
@@ -102,26 +96,10 @@ export default function LeadershipDashboard({ students }) {
     color: LIFECYCLE_BAR_COLOR[status],
   }))
 
-  const arByRiskRows = ['High', 'Medium', 'Low'].map((level) => {
-    const matching = students.filter((s) => s.risk_level === level)
-    return {
-      label: level,
-      value: sumAr(matching),
-      color: RISK_BAR_COLOR[level],
-      suffix: ` · ${matching.length} student${matching.length === 1 ? '' : 's'}`,
-    }
-  })
-
   const missingByOss = groupCounts(
     students.filter((s) => !s.class_start_date),
     'oss_owner',
     'bg-amber-500',
-  )
-
-  const highRiskByLocation = groupCounts(
-    students.filter((s) => s.risk_level === 'High'),
-    'location',
-    'bg-red-500',
   )
 
   const upcomingByWeek = buildWeekBuckets(students, 6)
@@ -130,21 +108,7 @@ export default function LeadershipDashboard({ students }) {
     <section className="space-y-6">
       <KpiGrid kpis={kpis} />
 
-      <ChartCard
-        title="Students by Lifecycle Status"
-        subtitle="Distribution across the activation pipeline"
-      >
-        <BarChart rows={lifecycleRows} showZero />
-      </ChartCard>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard
-          title="AR Balance by Risk Level"
-          subtitle="How much AR sits in each risk bucket"
-        >
-          <BarChart rows={arByRiskRows} formatValue={fmtMoney} showZero />
-        </ChartCard>
-
         <ChartCard
           title="Upcoming Starts by Week"
           subtitle="Class start dates over the next 6 weeks"
@@ -161,17 +125,14 @@ export default function LeadershipDashboard({ students }) {
             emptyMessage="No students are missing a start date."
           />
         </ChartCard>
-
-        <ChartCard
-          title="High Risk Students by Location"
-          subtitle="Where attention is most needed"
-        >
-          <BarChart
-            rows={highRiskByLocation}
-            emptyMessage="No high-risk students."
-          />
-        </ChartCard>
       </div>
+
+      <ChartCard
+        title="Students by Lifecycle Status"
+        subtitle="Distribution across the activation pipeline"
+      >
+        <BarChart rows={lifecycleRows} showZero />
+      </ChartCard>
     </section>
   )
 }

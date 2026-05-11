@@ -5,7 +5,7 @@ import {
   LIFECYCLE_STATUSES,
   START_DATE_STATUSES,
 } from '../data/students'
-import { ConfidenceBadge, RiskBadge, StartStatusBadge, StatusBadge } from './Badge'
+import { StartStatusBadge, StatusBadge } from './Badge'
 import { fmtDate, fmtDateTime, fmtMoney, toInputDate } from '../utils/format'
 
 // Spec-defined editable surface — keep this list in sync with the brief.
@@ -98,12 +98,9 @@ export default function StudentDrawer({ student, currentUser, onClose, onSave })
       <aside className="fixed inset-y-0 right-0 w-full max-w-xl bg-white z-50 shadow-2xl flex flex-col">
         <header className="flex items-start justify-between px-6 py-4 border-b border-slate-200">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg font-semibold text-slate-900">
-                {student.student_name}
-              </h2>
-              <RiskBadge level={student.risk_level} />
-            </div>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {student.student_name}
+            </h2>
             <p className="text-sm text-slate-500">
               {student.student_id} · {student.agency_or_sponsor} ·{' '}
               {student.location}
@@ -434,11 +431,6 @@ function ForecastSection({ student, form, set }) {
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
         </select>
-        {form.forecast_confidence && (
-          <div className="mt-1">
-            <ConfidenceBadge level={form.forecast_confidence} />
-          </div>
-        )}
       </Field>
       <Field label="Forecast Notes">
         <textarea

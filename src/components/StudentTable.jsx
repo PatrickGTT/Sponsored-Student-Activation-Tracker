@@ -1,7 +1,6 @@
 import {
   FollowUpOverdueBadge,
   MissingStartDateBadge,
-  RiskBadge,
   StartStatusBadge,
   StatusBadge,
 } from './Badge'
@@ -42,7 +41,6 @@ export default function StudentTable({
               <Th>Lifecycle</Th>
               <Th>Class Start</Th>
               <Th className="text-right">AR</Th>
-              <Th>Risk</Th>
               {showPriorityReason ? <Th>Why Priority</Th> : <Th>Last Contact</Th>}
               <Th>Next Follow-up</Th>
               <Th>Updated</Th>
@@ -91,9 +89,6 @@ export default function StudentTable({
                   <div className="text-xs text-slate-500">
                     inv {fmtMoney(s.invoice_amount)}
                   </div>
-                </Td>
-                <Td>
-                  <RiskBadge level={s.risk_level} />
                 </Td>
                 {showPriorityReason ? (
                   <Td>
@@ -159,7 +154,6 @@ export default function StudentTable({
                     )}
                   </div>
                 </td>
-                <td />
                 <td />
                 <td />
                 <td />

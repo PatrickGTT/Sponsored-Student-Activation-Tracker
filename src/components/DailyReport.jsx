@@ -1,4 +1,4 @@
-import { RiskBadge, StatusBadge } from './Badge'
+import { StatusBadge } from './Badge'
 import { fmtDate, fmtMoney, parseLocalDate } from '../utils/format'
 
 // Lifecycle states that represent "has started" or later — for filtering
@@ -182,7 +182,6 @@ function Section({ tone, title, subtitle, students, emptyMessage, onSelect }) {
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <StatusBadge status={s.lifecycle_status} />
-                <RiskBadge level={s.risk_level} />
               </div>
               <div className="text-right">
                 <div className="text-xs text-slate-500">Start</div>
