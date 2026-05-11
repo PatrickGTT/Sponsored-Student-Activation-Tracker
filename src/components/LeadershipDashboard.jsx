@@ -39,7 +39,6 @@ export default function LeadershipDashboard({ students }) {
   const total = students.length
   const totalAr = sumAr(students)
   const missingStart = students.filter((s) => !s.class_start_date).length
-  const highRiskCount = students.filter((s) => s.risk_level === 'High').length
   const startingNext7 = students.filter(
     (s) =>
       s.days_until_start !== null &&
@@ -69,7 +68,6 @@ export default function LeadershipDashboard({ students }) {
       value: missingStart,
       tone: 'amber',
     },
-    { label: 'High Risk Students', value: highRiskCount, tone: 'red' },
     {
       label: 'Starting in Next 7 Days',
       value: startingNext7,
