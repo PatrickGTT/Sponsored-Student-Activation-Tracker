@@ -71,7 +71,7 @@ export default function DataToolbar({
       const text = await file.text()
       const result = parseStudentsCsv(text, students, {
         ...cfg.options,
-        locationToOss,
+        locationToOss: locationOss,
       })
 
       if (result.errors[0] === 'CSV is empty.' ||
