@@ -29,10 +29,31 @@ const LIFECYCLE_RENAMES = {
     'Agency Approved / Need to Confirm Start Date',
 }
 
+const NEW_DEFAULT_LIFECYCLE = 'Agency Approved / Need to Confirm Start Date'
+
 function migrateStudent(s) {
-  const renamed = LIFECYCLE_RENAMES[s.lifecycle_status]
-  if (renamed) return { ...s, lifecycle_status: renamed }
-  return s
+  let migrated = s
+
+  // 1. Old name → new name.
+  const renamed = LIFECYCLE_RENAMES[migrated.lifecycle_status]
+  if (renamed) {
+    migrated = { ...migrated, lifecycle_status: renamed }
+  }
+
+  // 2. Demote stale "Start Date Confirmed" imports. An earlier version of
+  //    the importer auto-set this lifecycle whenever PowerSuite had a class
+  //    start date. The OSS hadn't actually confirmed anything — that's
+  //    misleading. Walk those records back to the neutral default.
+  //    Only touches records still in the import default state (last edit
+  //    was CSV Import) — anything an OSS has worked is left alone.
+  if (
+    migrated.lifecycle_status === 'Start Date Confirmed' &&
+    migrated.last_updated_by === 'CSV Import'
+  ) {
+    migrated = { ...migrated, lifecycle_status: NEW_DEFAULT_LIFECYCLE }
+  }
+
+  return migrated
 }
 
 export function loadStudents(fallback) {

@@ -174,26 +174,25 @@ export function parseStudentsCsv(text, existingStudents = [], options) {
 
     // Decide lifecycle for this row.
     //   1. Existing student: keep their OSS-curated status — UNLESS the
-    //      student is in their pristine import default and the new rule
-    //      would change it. That catches students imported before the
-    //      lifecycle-default fix shipped.
+    //      record is still in a pristine import state (set by CSV Import
+    //      with a stale default). Those get re-defaulted on re-import.
     //   2. CSV explicitly provides a valid lifecycle: use it.
-    //   3. New student with a class start date: "Start Date Confirmed".
-    //   4. New student without a class start date: "Agency Approved / Pending
-    //      Start Date".
-    const naturalDefault = classStart ? 'Start Date Confirmed' : DEFAULT_LIFECYCLE
+    //   3. Otherwise: every new student starts at the single import default.
+    //      OSS hasn't confirmed anything yet — including the start date.
+    //      The start_date_status pill (Tentative / Not Set) communicates
+    //      whether PowerSuite has a date.
     let lifecycle
     if (existing) {
-      // Promotion gate: the record looks untouched (still on a stale default
-      // AND last_updated_by is CSV Import) → safe to advance to the new
-      // default. If any OSS has edited it, last_updated_by is the OSS user
-      // and we leave the lifecycle alone.
-      const isPristineDefault =
+      // Pristine import = set by "CSV Import" AND currently sitting on either
+      // the current default or a legacy default ("Start Date Confirmed" from
+      // an earlier import-default rule). If so, re-default. If any OSS has
+      // edited, last_updated_by is the OSS user and we leave it alone.
+      const isPristineImport =
+        existing.last_updated_by === 'CSV Import' &&
         (existing.lifecycle_status === DEFAULT_LIFECYCLE ||
           existing.lifecycle_status === 'Start Date Confirmed') &&
-        existing.last_updated_by === 'CSV Import' &&
-        existing.lifecycle_status !== naturalDefault
-      lifecycle = isPristineDefault ? naturalDefault : existing.lifecycle_status
+        existing.lifecycle_status !== DEFAULT_LIFECYCLE
+      lifecycle = isPristineImport ? DEFAULT_LIFECYCLE : existing.lifecycle_status
     } else if (
       record.lifecycle_status &&
       VALID_LIFECYCLES.has(record.lifecycle_status)
@@ -208,7 +207,7 @@ export function parseStudentsCsv(text, existingStudents = [], options) {
           `Row ${idx + 2}: unknown lifecycle_status "${record.lifecycle_status}" — defaulted.`,
         )
       }
-      lifecycle = naturalDefault
+      lifecycle = DEFAULT_LIFECYCLE
     }
     const location = record.location || (existing?.location ?? '')
     const ossOwner =

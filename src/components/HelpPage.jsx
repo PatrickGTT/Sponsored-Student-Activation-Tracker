@@ -92,14 +92,16 @@ export default function HelpPage() {
             Click the matching <em>Import</em> button in the toolbar at the
             top of the app.
           </li>
-          <li>
+            <li>
             The app <strong>upserts</strong>: existing students get their
             source-of-truth fields refreshed, and OSS-entered fields
             (lifecycle, notes, follow-ups) are{' '}
-            <strong>never overwritten</strong>. New PowerSuite students arrive
-            with lifecycle defaulting to <em>"Start Date Confirmed"</em>{' '}
-            (Tentative) if they have a class start date, otherwise{' '}
-            <em>"Agency Approved / Need to Confirm Start Date"</em>.
+            <strong>never overwritten</strong>. Every new PowerSuite student
+            arrives with lifecycle defaulting to{' '}
+            <em>"Agency Approved / Need to Confirm Start Date"</em> — OSS
+            hasn't confirmed anything yet. The Tentative / Not Set pill on
+            the Class Start column tells the OSS whether PowerSuite has a
+            date to work with.
           </li>
           <li>
             Rows where Funding = "Self Paid" are filtered out of PowerSuite
