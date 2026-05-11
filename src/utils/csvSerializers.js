@@ -1,58 +1,100 @@
 // Student-shape-aware CSV import + export.
 //
-// Import path: parseStudentsCsv(text) → { students, errors, importedCount }.
-// Export path: build*Csv(students) → CSV string ready for downloadCsv().
+// Import:
+//   parseStudentsCsv(text, existingStudents)
+//     → { upserted, added, updated, skipped, filtered, errors }
 //
-// On import, missing fields are filled with safe defaults (see DEFAULTS below).
-// `student_id` is honored if present, otherwise generated as S-IMP-NNNN.
+// Import is UPSERT-only — it never wipes OSS-entered fields. Match key:
+//   1. student_id (if the CSV has one)
+//   2. email (normalized to lowercase)
+//   3. student_name + phone (fallback)
+//
+// PowerSuite-style headers are auto-translated:
+//   FirstName + LastName  → student_name
+//   Balance               → current_ar_balance
+//   StartDate             → class_start_date
+//   Funding               → funding_type
+//
+// Sponsored-only filter: rows with empty funding or funding="Self Paid" are
+// filtered out. The tracker scope is sponsored students.
 
-import { LIFECYCLE_STATUSES } from '../data/students'
+import { LIFECYCLE_STATUSES, LOCATION_TO_OSS } from '../data/students'
 import { comparePriority } from './calculations'
 import { parseCsv, toCsv } from './csv'
-
-// Columns the user said the import CSV must accept.
-export const IMPORT_COLUMNS = [
-  'student_name',
-  'location',
-  'oss_owner',
-  'advisor_name',
-  'agency_or_sponsor',
-  'invoice_number',
-  'invoice_amount',
-  'current_ar_balance',
-  'funding_type',
-  'enrollment_date',
-  'class_start_date',
-  'lifecycle_status',
-  'last_contact_date',
-  'next_follow_up_date',
-  'notes',
-]
+import { parseLocalDate } from './format'
 
 const VALID_LIFECYCLES = new Set(LIFECYCLE_STATUSES)
 const VALID_CONFIDENCE = new Set(['High', 'Medium', 'Low'])
 const DEFAULT_LIFECYCLE = 'Agency Approved / Pending Start Date'
 
+// Funding values we treat as sponsored. Everything else (empty, "Self Paid",
+// "Cash", etc.) is filtered out at import.
+const SPONSORED_FUNDING = new Set([
+  'UNISA',
+  'WIOA',
+  'GI-Bill',
+  'VA',
+  'Voc Rehab',
+  'Affirm',
+  'Finance',
+])
+
 // ---------- Import ----------
 
-export function parseStudentsCsv(text) {
+export function parseStudentsCsv(text, existingStudents = []) {
   const rows = parseCsv(text)
   if (rows.length === 0) {
-    return { students: [], errors: ['CSV is empty.'], importedCount: 0 }
-  }
-
-  const headers = rows[0].map(normalizeHeader)
-  if (!headers.includes('student_name')) {
     return {
-      students: [],
-      errors: ['CSV must have a student_name column.'],
-      importedCount: 0,
+      upserted: existingStudents,
+      added: 0,
+      updated: 0,
+      skipped: 0,
+      filtered: 0,
+      errors: ['CSV is empty.'],
     }
   }
 
+  const headers = rows[0].map(normalizeHeader)
   const errors = []
-  const students = []
-  let nextSeq = 1
+
+  // Build lookups against existing students (for upsert matching).
+  const byId = new Map()
+  const byEmail = new Map()
+  const byNamePhone = new Map()
+  for (const s of existingStudents) {
+    if (s.student_id) byId.set(s.student_id.toLowerCase(), s)
+    if (s.email) byEmail.set(s.email.toLowerCase().trim(), s)
+    if (s.student_name && s.phone) {
+      byNamePhone.set(`${s.student_name.toLowerCase().trim()}|${s.phone.trim()}`, s)
+    }
+  }
+
+  // We don't strictly require `student_name` in the header — PowerSuite splits
+  // it into FirstName / LastName. As long as one of them exists, we're OK.
+  const hasName =
+    headers.includes('student_name') ||
+    headers.includes('firstname') ||
+    headers.includes('lastname')
+  if (!hasName) {
+    return {
+      upserted: existingStudents,
+      added: 0,
+      updated: 0,
+      skipped: 0,
+      filtered: 0,
+      errors: [
+        'CSV must include either a student_name column or FirstName + LastName columns.',
+      ],
+    }
+  }
+
+  let added = 0
+  let updated = 0
+  let skipped = 0
+  let filtered = 0
+  // Clone the existing list so we can splice in updates.
+  const merged = existingStudents.map((s) => ({ ...s }))
+  const indexById = new Map(merged.map((s, i) => [s.student_id, i]))
 
   rows.slice(1).forEach((rawRow, idx) => {
     const record = {}
@@ -60,66 +102,155 @@ export function parseStudentsCsv(text) {
       record[h] = (rawRow[i] || '').trim()
     })
 
+    // Translate PowerSuite shape into our field names.
+    const firstName = record.firstname || ''
+    const lastName = record.lastname || ''
+    if (!record.student_name && (firstName || lastName)) {
+      record.student_name = `${firstName} ${lastName}`.trim()
+    }
+    if (!record.current_ar_balance && record.balance != null) {
+      record.current_ar_balance = record.balance
+    }
+    if (!record.class_start_date && record.startdate) {
+      record.class_start_date = record.startdate
+    }
+    if (!record.funding_type && record.funding) {
+      record.funding_type = record.funding
+    }
+
     if (!record.student_name) {
-      errors.push(`Row ${idx + 2}: missing student_name — skipped.`)
+      errors.push(`Row ${idx + 2}: missing student name — skipped.`)
+      skipped++
       return
     }
 
-    const lifecycle = record.lifecycle_status
-    let resolvedLifecycle = DEFAULT_LIFECYCLE
-    if (lifecycle) {
-      if (VALID_LIFECYCLES.has(lifecycle)) {
-        resolvedLifecycle = lifecycle
+    // ---- Filter: skip only Self Paid rows. ----
+    // Empty funding is intentionally KEPT — those may be future-agency
+    // students who haven't been set up with funding yet, and we don't want
+    // them slipping through the cracks. An OSS can flag the funding when it
+    // arrives.
+    const funding = (record.funding_type || '').trim()
+    if (funding.toLowerCase() === 'self paid') {
+      filtered++
+      return
+    }
+    // Normalize funding casing against our known list (case-insensitive match).
+    // Empty funding stays empty — surfaces in the UI as "—".
+    const fundingNormalized = funding ? normalizeFunding(funding) : ''
+
+    // ---- Upsert lookup ----
+    const lookupEmail = (record.email || '').toLowerCase().trim()
+    const lookupNamePhone = record.student_name && record.phone
+      ? `${record.student_name.toLowerCase().trim()}|${record.phone.trim()}`
+      : null
+
+    let existing = null
+    if (record.student_id && byId.has(record.student_id.toLowerCase())) {
+      existing = byId.get(record.student_id.toLowerCase())
+    } else if (lookupEmail && byEmail.has(lookupEmail)) {
+      existing = byEmail.get(lookupEmail)
+    } else if (lookupNamePhone && byNamePhone.has(lookupNamePhone)) {
+      existing = byNamePhone.get(lookupNamePhone)
+    }
+
+    // Validate lifecycle if provided.
+    let lifecycle = existing ? existing.lifecycle_status : DEFAULT_LIFECYCLE
+    if (record.lifecycle_status) {
+      if (VALID_LIFECYCLES.has(record.lifecycle_status)) {
+        // Only adopt the imported lifecycle if it's a NEW student. For existing
+        // students we never overwrite the OSS-curated status from a CSV import.
+        if (!existing) lifecycle = record.lifecycle_status
       } else {
         errors.push(
-          `Row ${idx + 2}: unknown lifecycle_status "${lifecycle}", defaulted to "${DEFAULT_LIFECYCLE}".`,
+          `Row ${idx + 2}: unknown lifecycle_status "${record.lifecycle_status}" — ignored.`,
         )
       }
     }
 
     const classStart = parseDate(record.class_start_date)
+    const location = record.location || (existing?.location ?? '')
+    const ossOwner =
+      record.oss_owner ||
+      existing?.oss_owner ||
+      LOCATION_TO_OSS[location] ||
+      ''
 
-    students.push({
-      student_id:
-        record.student_id || `S-IMP-${String(nextSeq).padStart(4, '0')}`,
+    // Fields that always come from the import (PowerSuite / QBO source-of-truth):
+    const importedFields = {
       student_name: record.student_name,
-      location: record.location || '',
-      oss_owner: record.oss_owner || '',
-      advisor_name: record.advisor_name || '',
-      agency_or_sponsor: record.agency_or_sponsor || '',
-      invoice_number: record.invoice_number || '',
-      invoice_amount: parseNumber(record.invoice_amount),
+      email: record.email || existing?.email || '',
+      phone: record.phone || existing?.phone || '',
+      location,
+      advisor_name: record.advisor_name || existing?.advisor_name || '',
+      agency_or_sponsor:
+        record.agency_or_sponsor || existing?.agency_or_sponsor || fundingNormalized,
+      invoice_number: record.invoice_number || existing?.invoice_number || '',
+      invoice_amount: parseNumber(
+        record.invoice_amount != null && record.invoice_amount !== ''
+          ? record.invoice_amount
+          : existing?.invoice_amount,
+      ),
       current_ar_balance: parseNumber(record.current_ar_balance),
-      funding_type: record.funding_type || '',
-      enrollment_date: parseDate(record.enrollment_date),
-      class_start_date: classStart,
-      // start_date_status isn't in the import spec — derive a sensible default.
-      start_date_status: record.start_date_status || (classStart ? 'Tentative' : 'Not Set'),
-      lifecycle_status: resolvedLifecycle,
-      last_contact_date: parseDate(record.last_contact_date),
-      contact_method: record.contact_method || null,
-      contact_result: record.contact_result || null,
-      next_follow_up_date: parseDate(record.next_follow_up_date),
-      notes: record.notes || '',
-      last_updated_at: new Date().toISOString(),
-      last_updated_by: 'CSV Import',
-      // Forecast overrides — preserved if present (so Export All → Import
-      // round-trips cleanly). Empty / missing → null = "use computed".
-      expected_payment_date: parseDate(record.expected_payment_date),
-      expected_payment_amount:
-        record.expected_payment_amount === '' ||
-        record.expected_payment_amount == null
-          ? null
-          : parseNumber(record.expected_payment_amount),
-      forecast_confidence: VALID_CONFIDENCE.has(record.forecast_confidence)
-        ? record.forecast_confidence
-        : null,
-      forecast_notes: record.forecast_notes || '',
-    })
-    nextSeq++
+      funding_type: fundingNormalized,
+      enrollment_date:
+        parseDate(record.enrollment_date) || existing?.enrollment_date || null,
+      class_start_date: classStart || existing?.class_start_date || null,
+    }
+
+    if (existing) {
+      // ---- UPDATE path: preserve OSS-entered fields ----
+      const idx = indexById.get(existing.student_id)
+      merged[idx] = {
+        ...existing,
+        ...importedFields,
+        oss_owner: existing.oss_owner || ossOwner,
+        // Adjust start_date_status only if the start date materially changed.
+        start_date_status:
+          classStart && classStart !== existing.class_start_date
+            ? 'Tentative'
+            : existing.start_date_status,
+        last_updated_at: new Date().toISOString(),
+        last_updated_by: 'CSV Import',
+      }
+      updated++
+    } else {
+      // ---- INSERT path: brand-new student ----
+      merged.push({
+        student_id: record.student_id || generateId(merged),
+        ...importedFields,
+        oss_owner: ossOwner,
+        start_date_status: classStart ? 'Tentative' : 'Not Set',
+        lifecycle_status: lifecycle,
+        last_contact_date: parseDate(record.last_contact_date) || null,
+        contact_method: record.contact_method || null,
+        contact_result: record.contact_result || null,
+        next_follow_up_date: parseDate(record.next_follow_up_date) || null,
+        notes: record.notes || '',
+        last_updated_at: new Date().toISOString(),
+        last_updated_by: 'CSV Import',
+        expected_payment_date: parseDate(record.expected_payment_date),
+        expected_payment_amount:
+          record.expected_payment_amount === '' ||
+          record.expected_payment_amount == null
+            ? null
+            : parseNumber(record.expected_payment_amount),
+        forecast_confidence: VALID_CONFIDENCE.has(record.forecast_confidence)
+          ? record.forecast_confidence
+          : null,
+        forecast_notes: record.forecast_notes || '',
+      })
+      added++
+    }
   })
 
-  return { students, errors, importedCount: students.length }
+  return {
+    upserted: merged,
+    added,
+    updated,
+    skipped,
+    filtered,
+    errors,
+  }
 }
 
 function normalizeHeader(h) {
@@ -127,6 +258,21 @@ function normalizeHeader(h) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '_')
+}
+
+function normalizeFunding(v) {
+  const t = v.trim()
+  const known = [
+    'UNISA',
+    'WIOA',
+    'GI-Bill',
+    'VA',
+    'Voc Rehab',
+    'Affirm',
+    'Finance',
+  ]
+  const match = known.find((k) => k.toLowerCase() === t.toLowerCase())
+  return match || t
 }
 
 function parseNumber(v) {
@@ -149,11 +295,21 @@ function parseDate(v) {
   return `${y}-${m}-${day}`
 }
 
+function generateId(existing) {
+  // Auto-assign an IMP-#### id. Find the next number that doesn't collide.
+  let n = existing.length + 1
+  const taken = new Set(existing.map((s) => s.student_id))
+  while (taken.has(`IMP-${String(n).padStart(4, '0')}`)) n++
+  return `IMP-${String(n).padStart(4, '0')}`
+}
+
 // ---------- Exports ----------
 
 const ALL_STUDENTS_COLUMNS = [
   'student_id',
   'student_name',
+  'email',
+  'phone',
   'location',
   'oss_owner',
   'advisor_name',
@@ -190,6 +346,8 @@ export function buildAllStudentsCsv(students) {
 const PRIORITY_COLUMNS = [
   'student_id',
   'student_name',
+  'email',
+  'phone',
   'location',
   'oss_owner',
   'agency_or_sponsor',
@@ -258,9 +416,8 @@ export function buildForecastCsv(enrichedStudents) {
 }
 
 function weekStarting(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return ''
+  const d = parseLocalDate(dateStr)
+  if (!d) return ''
   d.setHours(0, 0, 0, 0)
   const day = d.getDay()
   const diff = day === 0 ? -6 : 1 - day

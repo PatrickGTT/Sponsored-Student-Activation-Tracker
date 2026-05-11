@@ -126,6 +126,8 @@ export default function StudentDrawer({ student, currentUser, onClose, onSave })
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           <ReadOnlyGrid
             rows={[
+              ['Email', student.email],
+              ['Phone', student.phone],
               ['Funding Type', student.funding_type],
               ['Invoice #', student.invoice_number],
               ['Invoice Amount', fmtMoney(student.invoice_amount)],

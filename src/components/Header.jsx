@@ -70,12 +70,18 @@ export default function Header({
         </label>
       </div>
       <div className="max-w-[1400px] mx-auto px-6 pb-3">
-        <nav className="inline-flex gap-1 bg-slate-100 rounded-lg p-1">
+        <nav className="inline-flex gap-1 bg-slate-100 rounded-lg p-1 flex-wrap">
           <TabBtn
             active={view === 'dashboard'}
             onClick={() => onChangeView('dashboard')}
           >
             Dashboard
+          </TabBtn>
+          <TabBtn
+            active={view === 'daily_report'}
+            onClick={() => onChangeView('daily_report')}
+          >
+            Daily Report
           </TabBtn>
           <TabBtn
             active={view === 'priority'}
@@ -97,6 +103,9 @@ export default function Header({
           </TabBtn>
           <TabBtn active={view === 'forecast'} onClick={() => onChangeView('forecast')}>
             Forecast
+          </TabBtn>
+          <TabBtn active={view === 'help'} onClick={() => onChangeView('help')}>
+            How It Works
           </TabBtn>
         </nav>
       </div>

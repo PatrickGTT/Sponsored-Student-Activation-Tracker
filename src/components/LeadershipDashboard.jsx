@@ -1,5 +1,5 @@
 import { LIFECYCLE_STATUSES } from '../data/students'
-import { fmtMoney } from '../utils/format'
+import { fmtMoney, parseLocalDate } from '../utils/format'
 
 // Lifecycle states where the student hasn't started class yet — used by the
 // "Starting in Next 7 Days" KPI to avoid double-counting students who have
@@ -296,8 +296,8 @@ function buildWeekBuckets(students, weekCount) {
     weekEnd.setDate(weekStart.getDate() + 6)
 
     const count = students.filter((s) => {
-      if (!s.class_start_date) return false
-      const sd = new Date(s.class_start_date)
+      const sd = parseLocalDate(s.class_start_date)
+      if (!sd) return false
       sd.setHours(0, 0, 0, 0)
       return sd >= weekStart && sd <= weekEnd
     }).length

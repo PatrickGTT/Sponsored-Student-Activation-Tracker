@@ -2,13 +2,15 @@
 // All functions are pure — they don't mutate the input — so they can be
 // called in render paths without side effects.
 
+import { parseLocalDate } from './format'
+
 const DAY_MS = 1000 * 60 * 60 * 24
 
 function diffDays(from, to) {
   if (!from || !to) return null
-  const a = new Date(from)
-  const b = new Date(to)
-  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null
+  const a = parseLocalDate(from)
+  const b = parseLocalDate(to)
+  if (!a || !b) return null
   // Strip time so partial days don't skew the count.
   a.setHours(0, 0, 0, 0)
   b.setHours(0, 0, 0, 0)
@@ -169,12 +171,8 @@ export function comparePriority(a, b) {
 
   // Earliest start date wins. Records with no start date sort to the end —
   // they're already pulled to the top of the list by the High Risk rule.
-  const aStart = a.class_start_date
-    ? new Date(a.class_start_date).getTime()
-    : Number.POSITIVE_INFINITY
-  const bStart = b.class_start_date
-    ? new Date(b.class_start_date).getTime()
-    : Number.POSITIVE_INFINITY
+  const aStart = parseLocalDate(a.class_start_date)?.getTime() ?? Number.POSITIVE_INFINITY
+  const bStart = parseLocalDate(b.class_start_date)?.getTime() ?? Number.POSITIVE_INFINITY
   if (aStart !== bStart) return aStart - bStart
 
   // Largest AR wins.
@@ -182,11 +180,7 @@ export function comparePriority(a, b) {
   if (arDelta !== 0) return arDelta
 
   // Oldest last contact wins. Null is treated as oldest possible (most urgent).
-  const aContact = a.last_contact_date
-    ? new Date(a.last_contact_date).getTime()
-    : Number.NEGATIVE_INFINITY
-  const bContact = b.last_contact_date
-    ? new Date(b.last_contact_date).getTime()
-    : Number.NEGATIVE_INFINITY
+  const aContact = parseLocalDate(a.last_contact_date)?.getTime() ?? Number.NEGATIVE_INFINITY
+  const bContact = parseLocalDate(b.last_contact_date)?.getTime() ?? Number.NEGATIVE_INFINITY
   return aContact - bContact
 }

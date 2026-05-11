@@ -5,11 +5,11 @@ import {
   StartStatusBadge,
   StatusBadge,
 } from './Badge'
-import { fmtDate, fmtMoney, fmtRelative } from '../utils/format'
+import { fmtDate, fmtMoney, fmtRelative, parseLocalDate } from '../utils/format'
 
 function isFollowUpOverdue(dateStr) {
-  if (!dateStr) return false
-  const d = new Date(dateStr)
+  const d = parseLocalDate(dateStr)
+  if (!d) return false
   d.setHours(0, 0, 0, 0)
   const today = new Date()
   today.setHours(0, 0, 0, 0)

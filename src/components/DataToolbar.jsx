@@ -11,11 +11,7 @@ function todayTag() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function DataToolbar({
-  students,
-  onReplaceStudents,
-  onResetDemo,
-}) {
+export default function DataToolbar({ students, onUpsertStudents, onResetDemo }) {
   const fileInputRef = useRef(null)
   const [status, setStatus] = useState(null)
 
@@ -25,36 +21,30 @@ export default function DataToolbar({
 
   async function handleFile(e) {
     const file = e.target.files?.[0]
-    e.target.value = '' // allow re-importing the same filename later
+    e.target.value = ''
     if (!file) return
-
-    const ok = window.confirm(
-      `Importing "${file.name}" will replace the current ${students.length} student records. Continue?`,
-    )
-    if (!ok) return
 
     try {
       const text = await file.text()
-      const result = parseStudentsCsv(text)
+      const result = parseStudentsCsv(text, students)
 
-      if (result.students.length === 0) {
-        setStatus({
-          tone: 'error',
-          text:
-            result.errors[0] ||
-            'No valid rows found in CSV. Make sure a student_name column is present.',
-        })
+      if (result.errors.some((er) => er.startsWith('CSV must include') || er === 'CSV is empty.')) {
+        setStatus({ tone: 'error', text: result.errors[0] })
         return
       }
 
-      onReplaceStudents(result.students)
-      const skipped = result.errors.length
+      onUpsertStudents(result.upserted)
+
+      const parts = []
+      if (result.added > 0) parts.push(`${result.added} new`)
+      if (result.updated > 0) parts.push(`${result.updated} updated`)
+      if (result.filtered > 0) parts.push(`${result.filtered} self-paid skipped`)
+      if (result.skipped > 0) parts.push(`${result.skipped} invalid`)
+
       setStatus({
         tone: 'success',
-        text: `Imported ${result.importedCount} students from ${file.name}${
-          skipped > 0 ? ` · ${skipped} row${skipped === 1 ? '' : 's'} skipped` : ''
-        }`,
-        details: skipped > 0 ? result.errors : null,
+        text: `Imported ${file.name} · ${parts.join(' · ') || 'no changes'}`,
+        details: result.errors.length > 0 ? result.errors : null,
       })
     } catch (err) {
       setStatus({ tone: 'error', text: `Import failed: ${err.message}` })
@@ -95,9 +85,12 @@ export default function DataToolbar({
   return (
     <div className="bg-white rounded-lg border border-slate-200 px-4 py-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-medium text-slate-500 uppercase tracking-wide mr-1">
-          Data
-        </span>
+        <div className="mr-2">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide block">
+            Data
+          </span>
+          <span className="text-[11px] text-slate-400">Import is upsert — OSS notes are preserved.</span>
+        </div>
 
         <input
           ref={fileInputRef}
@@ -137,8 +130,7 @@ export default function DataToolbar({
       {status?.details && status.details.length > 0 && (
         <details className="mt-2 text-xs text-slate-600">
           <summary className="cursor-pointer hover:text-slate-900">
-            Show {status.details.length} skipped row
-            {status.details.length === 1 ? '' : 's'}
+            {status.details.length} note{status.details.length === 1 ? '' : 's'} from the import
           </summary>
           <ul className="mt-1 list-disc pl-5 space-y-0.5">
             {status.details.map((e, i) => (

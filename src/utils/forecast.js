@@ -11,6 +11,8 @@
 //   forecast_confidence     ('High' | 'Medium' | 'Low' | null)
 //   forecast_notes          (string)
 
+import { parseLocalDate } from './format'
+
 export const PROGRAM_DURATION_DAYS = 28
 
 const ZERO_AMOUNT_LIFECYCLES = new Set([
@@ -20,7 +22,8 @@ const ZERO_AMOUNT_LIFECYCLES = new Set([
 ])
 
 function addDays(date, n) {
-  const d = new Date(date)
+  const d = parseLocalDate(date)
+  if (!d) return null
   d.setHours(0, 0, 0, 0)
   d.setDate(d.getDate() + n)
   return d
@@ -28,8 +31,8 @@ function addDays(date, n) {
 
 function toIsoDate(d) {
   if (!d) return null
-  const dt = d instanceof Date ? d : new Date(d)
-  if (Number.isNaN(dt.getTime())) return null
+  const dt = d instanceof Date ? d : parseLocalDate(d)
+  if (!dt || Number.isNaN(dt.getTime())) return null
   const y = dt.getFullYear()
   const m = String(dt.getMonth() + 1).padStart(2, '0')
   const day = String(dt.getDate()).padStart(2, '0')

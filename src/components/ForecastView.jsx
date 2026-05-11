@@ -1,5 +1,5 @@
 import { ConfidenceBadge, StatusBadge } from './Badge'
-import { fmtDate, fmtMoney } from '../utils/format'
+import { fmtDate, fmtMoney, parseLocalDate } from '../utils/format'
 
 const WEEK_COUNT = 12
 
@@ -261,9 +261,8 @@ function startOfWeek(date) {
 }
 
 function parseDate(d) {
-  if (!d) return null
-  const dt = new Date(d)
-  if (Number.isNaN(dt.getTime())) return null
+  const dt = parseLocalDate(d)
+  if (!dt) return null
   dt.setHours(0, 0, 0, 0)
   return dt
 }

@@ -17,6 +17,8 @@ import StudentTable from './components/StudentTable'
 import StudentDrawer from './components/StudentDrawer'
 import ForecastView from './components/ForecastView'
 import DataToolbar from './components/DataToolbar'
+import DailyReport from './components/DailyReport'
+import HelpPage from './components/HelpPage'
 
 const DEFAULT_FILTERS = {
   oss_owner: 'All',
@@ -128,10 +130,11 @@ export default function App() {
     )
   }
 
-  function handleReplaceStudents(newStudents) {
-    setStudents(newStudents)
-    setSelectedId(null) // close any open drawer — IDs likely changed
-    setFilters(DEFAULT_FILTERS) // reset filters that referenced old values
+  function handleUpsertStudents(mergedStudents) {
+    // The parser returned the full merged list (existing + upserted rows).
+    setStudents(mergedStudents)
+    // No need to close the drawer — upsert preserves student_id, so any
+    // currently-open record is still valid.
   }
 
   function handleResetDemo() {
@@ -161,11 +164,20 @@ export default function App() {
             <LeadershipDashboard students={enriched} />
             <DataToolbar
               students={enriched}
-              onReplaceStudents={handleReplaceStudents}
+              onUpsertStudents={handleUpsertStudents}
               onResetDemo={handleResetDemo}
             />
           </>
         )}
+
+        {view === 'daily_report' && (
+          <DailyReport
+            students={enriched}
+            onSelect={(s) => setSelectedId(s.student_id)}
+          />
+        )}
+
+        {view === 'help' && <HelpPage />}
 
         {view === 'priority' && (
           <>
