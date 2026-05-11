@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { STUDENTS } from './data/students'
+import { LOCATION_TO_OSS, STUDENTS } from './data/students'
 import {
   comparePriority,
   daysSinceEnrollment,
@@ -20,12 +20,25 @@ import DataToolbar from './components/DataToolbar'
 import DailyReport from './components/DailyReport'
 import HelpPage from './components/HelpPage'
 import {
+  clearImportHistory,
+  clearLocationOss,
   clearStudents,
   loadCurrentUser,
+  loadImportHistory,
+  loadLocationOss,
   loadStudents,
   saveCurrentUser,
+  saveImportHistory,
+  saveLocationOss,
   saveStudents,
 } from './utils/storage'
+
+const EMPTY_IMPORT_HISTORY = {
+  powersuite: null,
+  enrollment: null,
+  quickbooks: null,
+  oss_names: null,
+}
 
 const DEFAULT_FILTERS = {
   oss_owner: 'All',
@@ -69,6 +82,16 @@ export default function App() {
     }
   }, [ossUsers, currentUser])
 
+  // Location → OSS lookup. Persisted so OSS Names imports stick around. Used
+  // by the CSV parser to auto-assign OSS owners by Location on new students.
+  const [locationOss, setLocationOss] = useState(() => loadLocationOss(LOCATION_TO_OSS))
+
+  // Per-source last-import metadata so the toolbar can show "students-may-11.csv,
+  // imported 2h ago" under each button.
+  const [importHistory, setImportHistory] = useState(() =>
+    loadImportHistory(EMPTY_IMPORT_HISTORY),
+  )
+
   // Persist on every change. JSON-serializing 300+ student records is well
   // under 1 MB so this is fast and well under the localStorage quota.
   useEffect(() => {
@@ -77,6 +100,12 @@ export default function App() {
   useEffect(() => {
     saveCurrentUser(currentUser)
   }, [currentUser])
+  useEffect(() => {
+    saveLocationOss(locationOss)
+  }, [locationOss])
+  useEffect(() => {
+    saveImportHistory(importHistory)
+  }, [importHistory])
 
   const enriched = useMemo(
     () =>
@@ -166,22 +195,59 @@ export default function App() {
 
   function handleResetDemo() {
     clearStudents()
+    clearLocationOss()
+    clearImportHistory()
     setStudents(STUDENTS)
+    setLocationOss(LOCATION_TO_OSS)
+    setImportHistory(EMPTY_IMPORT_HISTORY)
     setSelectedId(null)
     setFilters(DEFAULT_FILTERS)
   }
 
+  function handleRecordImport(source, info) {
+    setImportHistory((prev) => ({
+      ...prev,
+      [source]: { ...info, timestamp: new Date().toISOString() },
+    }))
+  }
+
+  // OSS Names import: merge the new location→OSS mapping in, and backfill
+  // oss_owner on any existing students whose oss_owner is empty.
+  function handleUpsertOssMapping(newMapping) {
+    const merged = { ...locationOss, ...newMapping }
+    setLocationOss(merged)
+    setStudents((prev) =>
+      prev.map((s) => {
+        if (s.oss_owner) return s
+        const assigned = merged[s.location]
+        if (!assigned) return s
+        return { ...s, oss_owner: assigned }
+      }),
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
-      <Header
-        view={view}
-        onChangeView={setView}
-        currentUser={currentUser}
-        onChangeUser={setCurrentUser}
-        ossUsers={ossUsers}
-        myStudentsCount={myStudentsCount}
-        priorityCount={priorityCount}
-      />
+      <div className="sticky top-0 z-30 shadow-sm">
+        <Header
+          view={view}
+          onChangeView={setView}
+          currentUser={currentUser}
+          onChangeUser={setCurrentUser}
+          ossUsers={ossUsers}
+          myStudentsCount={myStudentsCount}
+          priorityCount={priorityCount}
+        />
+        <DataToolbar
+          students={enriched}
+          locationOss={locationOss}
+          importHistory={importHistory}
+          onUpsertStudents={handleUpsertStudents}
+          onUpsertOssMapping={handleUpsertOssMapping}
+          onRecordImport={handleRecordImport}
+          onResetDemo={handleResetDemo}
+        />
+      </div>
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-6 py-6 space-y-6">
         {view === 'dashboard' && (
           <>
@@ -190,11 +256,6 @@ export default function App() {
               description="Org-wide view of sponsored students, AR exposure, and where leadership should focus this week."
             />
             <LeadershipDashboard students={enriched} />
-            <DataToolbar
-              students={enriched}
-              onUpsertStudents={handleUpsertStudents}
-              onResetDemo={handleResetDemo}
-            />
           </>
         )}
 

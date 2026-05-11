@@ -9,6 +9,8 @@
 
 const STUDENTS_KEY = 'ssat:students:v1'
 const CURRENT_USER_KEY = 'ssat:currentUser:v1'
+const LOCATION_OSS_KEY = 'ssat:locationOss:v1'
+const IMPORT_HISTORY_KEY = 'ssat:importHistory:v1'
 
 function safe(fn, fallback) {
   try {
@@ -49,5 +51,52 @@ export function saveCurrentUser(user) {
   safe(() => {
     if (user) localStorage.setItem(CURRENT_USER_KEY, user)
     else localStorage.removeItem(CURRENT_USER_KEY)
+  })
+}
+
+export function loadLocationOss(fallback) {
+  return safe(() => {
+    const raw = localStorage.getItem(LOCATION_OSS_KEY)
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return fallback
+    // Merge persisted on top of bundled defaults so new defaults still flow.
+    return { ...fallback, ...parsed }
+  }, fallback)
+}
+
+export function saveLocationOss(mapping) {
+  safe(() => {
+    localStorage.setItem(LOCATION_OSS_KEY, JSON.stringify(mapping))
+  })
+}
+
+export function clearLocationOss() {
+  safe(() => {
+    localStorage.removeItem(LOCATION_OSS_KEY)
+  })
+}
+
+// Import history: per-source { filename, timestamp, summary } so the toolbar
+// can show "last imported" details under each import button.
+export function loadImportHistory(fallback) {
+  return safe(() => {
+    const raw = localStorage.getItem(IMPORT_HISTORY_KEY)
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return fallback
+    return { ...fallback, ...parsed }
+  }, fallback)
+}
+
+export function saveImportHistory(history) {
+  safe(() => {
+    localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(history))
+  })
+}
+
+export function clearImportHistory() {
+  safe(() => {
+    localStorage.removeItem(IMPORT_HISTORY_KEY)
   })
 }

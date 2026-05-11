@@ -41,7 +41,21 @@ const SPONSORED_FUNDING = new Set([
 
 // ---------- Import ----------
 
-export function parseStudentsCsv(text, existingStudents = []) {
+// options:
+//   allowAddNew     (default true)  — if false, rows that don't match an
+//                                     existing student get reported, not added.
+//                                     Use for Enrollment / QBO imports that
+//                                     should only enrich existing students.
+//   applySponsoredFilter (default true) — if false, "Self Paid" rows are kept.
+//   locationToOss   (default LOCATION_TO_OSS) — used to auto-assign oss_owner
+//                                     for new students by Location.
+export function parseStudentsCsv(text, existingStudents = [], options = {}) {
+  const {
+    allowAddNew = true,
+    applySponsoredFilter = true,
+    locationToOss = LOCATION_TO_OSS,
+  } = options
+
   const rows = parseCsv(text)
   if (rows.length === 0) {
     return {
@@ -50,6 +64,7 @@ export function parseStudentsCsv(text, existingStudents = []) {
       updated: 0,
       skipped: 0,
       filtered: 0,
+      notFound: 0,
       errors: ['CSV is empty.'],
     }
   }
@@ -92,6 +107,7 @@ export function parseStudentsCsv(text, existingStudents = []) {
   let updated = 0
   let skipped = 0
   let filtered = 0
+  let notFound = 0
   // Clone the existing list so we can splice in updates.
   const merged = existingStudents.map((s) => ({ ...s }))
   const indexById = new Map(merged.map((s, i) => [s.student_id, i]))
@@ -130,7 +146,7 @@ export function parseStudentsCsv(text, existingStudents = []) {
     // them slipping through the cracks. An OSS can flag the funding when it
     // arrives.
     const funding = (record.funding_type || '').trim()
-    if (funding.toLowerCase() === 'self paid') {
+    if (applySponsoredFilter && funding.toLowerCase() === 'self paid') {
       filtered++
       return
     }
@@ -153,26 +169,40 @@ export function parseStudentsCsv(text, existingStudents = []) {
       existing = byNamePhone.get(lookupNamePhone)
     }
 
-    // Validate lifecycle if provided.
-    let lifecycle = existing ? existing.lifecycle_status : DEFAULT_LIFECYCLE
-    if (record.lifecycle_status) {
-      if (VALID_LIFECYCLES.has(record.lifecycle_status)) {
-        // Only adopt the imported lifecycle if it's a NEW student. For existing
-        // students we never overwrite the OSS-curated status from a CSV import.
-        if (!existing) lifecycle = record.lifecycle_status
-      } else {
+    const classStart = parseDate(record.class_start_date)
+
+    // Decide lifecycle for this row.
+    //   1. Existing student: keep their OSS-curated status (never overwrite).
+    //   2. CSV explicitly provides a valid lifecycle: use it.
+    //   3. New student with a class start date: "Start Date Confirmed" —
+    //      the start_date_status = "Tentative" signals it's not yet
+    //      OSS-confirmed with the student.
+    //   4. New student without a class start date: "Agency Approved / Pending
+    //      Start Date".
+    let lifecycle
+    if (existing) {
+      lifecycle = existing.lifecycle_status
+    } else if (
+      record.lifecycle_status &&
+      VALID_LIFECYCLES.has(record.lifecycle_status)
+    ) {
+      lifecycle = record.lifecycle_status
+    } else {
+      if (
+        record.lifecycle_status &&
+        !VALID_LIFECYCLES.has(record.lifecycle_status)
+      ) {
         errors.push(
-          `Row ${idx + 2}: unknown lifecycle_status "${record.lifecycle_status}" — ignored.`,
+          `Row ${idx + 2}: unknown lifecycle_status "${record.lifecycle_status}" — defaulted.`,
         )
       }
+      lifecycle = classStart ? 'Start Date Confirmed' : DEFAULT_LIFECYCLE
     }
-
-    const classStart = parseDate(record.class_start_date)
     const location = record.location || (existing?.location ?? '')
     const ossOwner =
       record.oss_owner ||
       existing?.oss_owner ||
-      LOCATION_TO_OSS[location] ||
+      locationToOss[location] ||
       ''
 
     // Fields that always come from the import (PowerSuite / QBO source-of-truth):
@@ -195,6 +225,15 @@ export function parseStudentsCsv(text, existingStudents = []) {
       enrollment_date:
         parseDate(record.enrollment_date) || existing?.enrollment_date || null,
       class_start_date: classStart || existing?.class_start_date || null,
+    }
+
+    if (!existing && !allowAddNew) {
+      // Update-only mode (Enrollment / QBO): skip rows we can't match.
+      notFound++
+      errors.push(
+        `Row ${idx + 2}: "${record.student_name}" not found in tracker — skipped (update-only mode).`,
+      )
+      return
     }
 
     if (existing) {
@@ -249,8 +288,47 @@ export function parseStudentsCsv(text, existingStudents = []) {
     updated,
     skipped,
     filtered,
+    notFound,
     errors,
   }
+}
+
+// Parses an OSS Mapping CSV (two columns: Location, OSS Owner) and returns
+// a { location: ossName } object. Used by the "Import OSS Names" button to
+// build/update the location-to-OSS lookup at runtime.
+export function parseOssMappingCsv(text) {
+  const rows = parseCsv(text)
+  if (rows.length === 0) {
+    return { mapping: {}, added: 0, errors: ['CSV is empty.'] }
+  }
+
+  const headers = rows[0].map(normalizeHeader)
+  const locIdx = headers.findIndex((h) => h === 'location')
+  const ossIdx = headers.findIndex(
+    (h) => h === 'oss_owner' || h === 'oss' || h === 'owner' || h === 'office_manager',
+  )
+
+  if (locIdx === -1 || ossIdx === -1) {
+    return {
+      mapping: {},
+      added: 0,
+      errors: ['CSV must include a Location column and an OSS Owner column.'],
+    }
+  }
+
+  const mapping = {}
+  const errors = []
+  rows.slice(1).forEach((row, idx) => {
+    const location = (row[locIdx] || '').trim()
+    const oss = (row[ossIdx] || '').trim()
+    if (!location || !oss) {
+      errors.push(`Row ${idx + 2}: missing location or OSS owner — skipped.`)
+      return
+    }
+    mapping[location] = oss
+  })
+
+  return { mapping, added: Object.keys(mapping).length, errors }
 }
 
 function normalizeHeader(h) {

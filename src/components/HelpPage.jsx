@@ -49,37 +49,71 @@ export default function HelpPage() {
       </Card>
 
       <Card title="Daily / weekly data flow">
+        <p className="mb-3">
+          The data toolbar (always visible at the top of the app) has{' '}
+          <strong>four import buttons</strong>, one per source:
+        </p>
+        <table className="w-full text-sm mb-4">
+          <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="text-left py-2 pr-3 w-36">Button</th>
+              <th className="text-left py-2 pr-3">Behavior</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            <Row
+              source="PowerSuite"
+              provides="Primary student roster. Adds new students; refreshes balance, location, start date, funding for existing. Self-Paid filtered."
+              method=""
+            />
+            <Row
+              source="Enrollment"
+              provides="Fills enrollment date, advisor, specific agency on students that already exist. Won't create new students."
+              method=""
+            />
+            <Row
+              source="QuickBooks"
+              provides="Refreshes invoice number and AR balance on existing students. Won't create new students."
+              method=""
+            />
+            <Row
+              source="OSS Names"
+              provides="Two-column CSV (Location, OSS Owner). Updates the location→OSS lookup and backfills oss_owner on students who don't have one."
+              method=""
+            />
+          </tbody>
+        </table>
         <ol className="list-decimal pl-5 space-y-2">
           <li>
-            <strong>Download the PowerSuite Open Balance report</strong> (CSV).
+            Download the relevant report (PowerSuite, Enrollment, QBO) → save
+            as CSV.
           </li>
           <li>
-            <strong>Open the Dashboard tab</strong> and click{' '}
-            <em>Import CSV</em> in the Data toolbar.
+            Click the matching <em>Import</em> button in the toolbar at the
+            top of the app.
           </li>
           <li>
             The app <strong>upserts</strong>: existing students get their
-            PowerSuite fields refreshed (balance, start date, funding), and
-            OSS-entered fields (lifecycle, notes, follow-ups) are{' '}
-            <strong>never overwritten</strong>. New students arrive with
-            lifecycle defaulting to "Agency Approved / Pending Start Date".
+            source-of-truth fields refreshed, and OSS-entered fields
+            (lifecycle, notes, follow-ups) are{' '}
+            <strong>never overwritten</strong>. New PowerSuite students arrive
+            with lifecycle defaulting to <em>"Start Date Confirmed"</em>{' '}
+            (Tentative) if they have a class start date, otherwise{' '}
+            <em>"Agency Approved / Pending Start Date"</em>.
           </li>
           <li>
-            Rows where Funding = "Self Paid" are filtered out at import.
-            Rows with an <strong>empty Funding</strong> column are kept —
-            those may be future-agency students whose funding hasn't been
-            set up yet, and we don't want them slipping through the cracks.
-            An OSS can update funding once it's confirmed.
+            Rows where Funding = "Self Paid" are filtered out of PowerSuite
+            imports. Rows with an empty Funding column are kept — those may
+            be future-agency students whose funding hasn't been set up yet.
           </li>
           <li>
-            <strong>OSS team works the app daily.</strong> Click a student row
-            → update lifecycle, log the contact attempt, set the next
-            follow-up date, write notes. Every change stamps your name and
-            the time.
+            <strong>OSS team works the app daily.</strong> Click a student
+            row → update lifecycle, log contact, set follow-up, write notes.
+            Every change stamps your name and the time.
           </li>
           <li>
-            <strong>Leadership opens the Dashboard and Daily Report</strong>{' '}
-            for the at-a-glance view. Finance opens the Forecast tab.
+            <strong>Leadership opens the Dashboard and Daily Report.</strong>{' '}
+            Finance opens the Forecast tab.
           </li>
         </ol>
       </Card>
