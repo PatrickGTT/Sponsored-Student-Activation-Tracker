@@ -161,7 +161,25 @@ export function needsMyUpdate(student, ossUser, today = new Date()) {
   return false
 }
 
-// Sort comparator for the Priority This Week view.
+// Default sort for every student-list view: earliest class start date first.
+// Students with no class start date sort to the end (TBD). Student name acts
+// as a stable tiebreaker.
+export function compareByStartDate(a, b) {
+  const aDate = a.class_start_date
+  const bDate = b.class_start_date
+  if (aDate && bDate) {
+    if (aDate < bDate) return -1
+    if (aDate > bDate) return 1
+  } else if (aDate) {
+    return -1
+  } else if (bDate) {
+    return 1
+  }
+  return (a.student_name || '').localeCompare(b.student_name || '')
+}
+
+// Sort comparator for the Priority This Week view (retained for reference,
+// not currently used — every view now sorts by class start date instead).
 // Order: High Risk first → earliest start date → largest AR → oldest last contact.
 const RISK_ORDER = { High: 0, Medium: 1, Low: 2 }
 

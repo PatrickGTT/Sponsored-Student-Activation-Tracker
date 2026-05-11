@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { LOCATION_TO_OSS, STUDENTS } from './data/students'
 import {
-  comparePriority,
+  compareByStartDate,
   daysSinceEnrollment,
   daysSinceLastContact,
   daysUntilStart,
@@ -163,10 +163,9 @@ export default function App() {
       return true
     })
 
-    if (view === 'priority') {
-      list = [...list].sort(comparePriority)
-    }
-    return list
+    // All student-list views sort by class start date ascending — earliest
+    // starts at the top, TBD (no date) sinks to the bottom.
+    return [...list].sort(compareByStartDate)
   }, [enriched, filters, view, currentUser])
 
   const selected = enriched.find((s) => s.student_id === selectedId) || null

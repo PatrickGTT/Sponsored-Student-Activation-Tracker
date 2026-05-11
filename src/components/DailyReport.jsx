@@ -1,5 +1,6 @@
 import { StatusBadge } from './Badge'
 import { fmtDate, fmtMoney, parseLocalDate } from '../utils/format'
+import { compareByStartDate } from '../utils/calculations'
 
 // Lifecycle states that represent "has started" or later — for filtering
 // "missed start" vs "started" sections.
@@ -43,38 +44,46 @@ export default function DailyReport({ students, onSelect }) {
   })
 
   // ---- Buckets ----
-  const startedYesterday = students.filter((s) => {
-    const d = parseLocalDate(s.class_start_date)
-    if (!d) return false
-    return isSameDay(d, yesterday) && STARTED_OR_LATER.has(s.lifecycle_status)
-  })
+  const startedYesterday = students
+    .filter((s) => {
+      const d = parseLocalDate(s.class_start_date)
+      if (!d) return false
+      return isSameDay(d, yesterday) && STARTED_OR_LATER.has(s.lifecycle_status)
+    })
+    .sort(compareByStartDate)
 
-  const missedYesterday = students.filter((s) => {
-    const d = parseLocalDate(s.class_start_date)
-    if (!d) return false
-    return isSameDay(d, yesterday) && !STARTED_OR_LATER.has(s.lifecycle_status)
-  })
+  const missedYesterday = students
+    .filter((s) => {
+      const d = parseLocalDate(s.class_start_date)
+      if (!d) return false
+      return isSameDay(d, yesterday) && !STARTED_OR_LATER.has(s.lifecycle_status)
+    })
+    .sort(compareByStartDate)
 
-  const startingToday = students.filter((s) => {
-    const d = parseLocalDate(s.class_start_date)
-    if (!d) return false
-    return isSameDay(d, today) && !STARTED_OR_LATER.has(s.lifecycle_status)
-  })
+  const startingToday = students
+    .filter((s) => {
+      const d = parseLocalDate(s.class_start_date)
+      if (!d) return false
+      return isSameDay(d, today) && !STARTED_OR_LATER.has(s.lifecycle_status)
+    })
+    .sort(compareByStartDate)
 
-  const startingThisWeek = students.filter((s) => {
-    const d = parseLocalDate(s.class_start_date)
-    if (!d) return false
-    const day = startOfDay(d)
-    return (
-      day > today &&
-      day <= inSevenDays &&
-      !STARTED_OR_LATER.has(s.lifecycle_status)
-    )
-  })
+  const startingThisWeek = students
+    .filter((s) => {
+      const d = parseLocalDate(s.class_start_date)
+      if (!d) return false
+      const day = startOfDay(d)
+      return (
+        day > today &&
+        day <= inSevenDays &&
+        !STARTED_OR_LATER.has(s.lifecycle_status)
+      )
+    })
+    .sort(compareByStartDate)
 
-  const missingStartDate = students.filter(
-    (s) => !s.class_start_date && PRE_START.has(s.lifecycle_status),
-  )
+  const missingStartDate = students
+    .filter((s) => !s.class_start_date && PRE_START.has(s.lifecycle_status))
+    .sort(compareByStartDate)
 
   return (
     <div className="space-y-5">
