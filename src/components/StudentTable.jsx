@@ -16,7 +16,12 @@ function isFollowUpOverdue(dateStr) {
   return d <= today
 }
 
-export default function StudentTable({ students, showPriorityReason, onSelect }) {
+export default function StudentTable({
+  students,
+  showPriorityReason,
+  showTotals,
+  onSelect,
+}) {
   if (students.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-slate-200 px-6 py-12 text-center text-sm text-slate-500">
@@ -122,6 +127,45 @@ export default function StudentTable({ students, showPriorityReason, onSelect })
               </tr>
             ))}
           </tbody>
+          {showTotals && (
+            <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+              <tr>
+                <td className="px-4 py-3 align-top">
+                  <div className="font-semibold text-slate-900">Total</div>
+                  <div className="text-xs text-slate-500">
+                    {students.length} student{students.length === 1 ? '' : 's'}
+                  </div>
+                </td>
+                <td />
+                <td />
+                <td />
+                <td />
+                <td className="px-4 py-3 align-top text-right">
+                  <div className="font-semibold text-slate-900">
+                    {fmtMoney(
+                      students.reduce(
+                        (sum, s) => sum + (s.current_ar_balance || 0),
+                        0,
+                      ),
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    inv{' '}
+                    {fmtMoney(
+                      students.reduce(
+                        (sum, s) => sum + (s.invoice_amount || 0),
+                        0,
+                      ),
+                    )}
+                  </div>
+                </td>
+                <td />
+                <td />
+                <td />
+                <td />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>

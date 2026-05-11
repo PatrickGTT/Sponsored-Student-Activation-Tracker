@@ -232,6 +232,7 @@ export default function App() {
             />
             <StudentTable
               students={visible}
+              showTotals
               onSelect={(s) => setSelectedId(s.student_id)}
             />
           </>

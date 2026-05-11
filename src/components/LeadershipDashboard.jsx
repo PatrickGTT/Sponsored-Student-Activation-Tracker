@@ -65,7 +65,11 @@ export default function LeadershipDashboard({ students }) {
 
   const kpis = [
     { label: 'Total Sponsored Students', value: total },
-    { label: 'Total Sponsored AR Balance', value: fmtMoney(totalAr) },
+    {
+      label: 'Total Sponsored AR Balance',
+      value: fmtMoney(totalAr),
+      sub: 'Sponsored only — Self-Paid AR tracked separately',
+    },
     {
       label: 'Students Missing Start Date',
       value: missingStart,
