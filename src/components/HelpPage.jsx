@@ -99,7 +99,7 @@ export default function HelpPage() {
             <strong>never overwritten</strong>. New PowerSuite students arrive
             with lifecycle defaulting to <em>"Start Date Confirmed"</em>{' '}
             (Tentative) if they have a class start date, otherwise{' '}
-            <em>"Agency Approved / Pending Start Date"</em>.
+            <em>"Agency Approved / Need to Confirm Start Date"</em>.
           </li>
           <li>
             Rows where Funding = "Self Paid" are filtered out of PowerSuite
@@ -169,7 +169,7 @@ export default function HelpPage() {
 
       <Card title="Lifecycle states">
         <ul className="space-y-1.5 text-sm">
-          <Lifecycle label="Agency Approved / Pending Start Date">
+          <Lifecycle label="Agency Approved / Need to Confirm Start Date">
             Paperwork done, no class start scheduled yet.
           </Lifecycle>
           <Lifecycle label="Start Date Confirmed">
@@ -252,7 +252,7 @@ export default function HelpPage() {
             days, Medium confidence
           </li>
           <li>
-            <strong>Agency Approved / Pending Start Date</strong> and similar
+            <strong>Agency Approved / Need to Confirm Start Date</strong> and similar
             pre-start states → TBD, Low confidence
           </li>
           <li>

@@ -157,7 +157,7 @@ export function needsMyUpdate(student, ossUser, today = new Date()) {
     const dnf = diffDays(today, student.next_follow_up_date)
     if (dnf !== null && dnf <= 0) return true
   }
-  if (student.lifecycle_status === 'Agency Approved / Pending Start Date') return true
+  if (student.lifecycle_status === 'Agency Approved / Need to Confirm Start Date') return true
   return false
 }
 

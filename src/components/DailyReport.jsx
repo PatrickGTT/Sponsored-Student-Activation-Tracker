@@ -11,7 +11,7 @@ const STARTED_OR_LATER = new Set([
 ])
 
 const PRE_START = new Set([
-  'Agency Approved / Pending Start Date',
+  'Agency Approved / Need to Confirm Start Date',
   'Start Date Confirmed',
   'Student Contacted – Awaiting Confirmation',
   'Student Unreachable',

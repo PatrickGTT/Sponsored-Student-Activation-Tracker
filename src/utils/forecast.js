@@ -98,7 +98,7 @@ export function computeForecast(student, today = new Date()) {
         reason: 'Rescheduled — start date may shift again.',
       }
 
-    case 'Agency Approved / Pending Start Date':
+    case 'Agency Approved / Need to Confirm Start Date':
       return {
         expectedDate: null,
         expectedAmount: ar,

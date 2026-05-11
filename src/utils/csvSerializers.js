@@ -25,7 +25,7 @@ import { parseLocalDate } from './format'
 
 const VALID_LIFECYCLES = new Set(LIFECYCLE_STATUSES)
 const VALID_CONFIDENCE = new Set(['High', 'Medium', 'Low'])
-const DEFAULT_LIFECYCLE = 'Agency Approved / Pending Start Date'
+const DEFAULT_LIFECYCLE = 'Agency Approved / Need to Confirm Start Date'
 
 // Funding values we treat as sponsored. Everything else (empty, "Self Paid",
 // "Cash", etc.) is filtered out at import.
@@ -49,12 +49,13 @@ const SPONSORED_FUNDING = new Set([
 //   applySponsoredFilter (default true) — if false, "Self Paid" rows are kept.
 //   locationToOss   (default LOCATION_TO_OSS) — used to auto-assign oss_owner
 //                                     for new students by Location.
-export function parseStudentsCsv(text, existingStudents = [], options = {}) {
-  const {
-    allowAddNew = true,
-    applySponsoredFilter = true,
-    locationToOss = LOCATION_TO_OSS,
-  } = options
+export function parseStudentsCsv(text, existingStudents = [], options) {
+  // Defensive option resolution — handles undefined options / hot-reload stale
+  // bindings cleanly without relying on parameter-default semantics.
+  const opts = options || {}
+  const allowAddNew = opts.allowAddNew !== false // default true
+  const applySponsoredFilter = opts.applySponsoredFilter !== false // default true
+  const locationToOss = opts.locationToOss || LOCATION_TO_OSS
 
   const rows = parseCsv(text)
   if (rows.length === 0) {
@@ -172,16 +173,27 @@ export function parseStudentsCsv(text, existingStudents = [], options = {}) {
     const classStart = parseDate(record.class_start_date)
 
     // Decide lifecycle for this row.
-    //   1. Existing student: keep their OSS-curated status (never overwrite).
+    //   1. Existing student: keep their OSS-curated status — UNLESS the
+    //      student is in their pristine import default and the new rule
+    //      would change it. That catches students imported before the
+    //      lifecycle-default fix shipped.
     //   2. CSV explicitly provides a valid lifecycle: use it.
-    //   3. New student with a class start date: "Start Date Confirmed" —
-    //      the start_date_status = "Tentative" signals it's not yet
-    //      OSS-confirmed with the student.
+    //   3. New student with a class start date: "Start Date Confirmed".
     //   4. New student without a class start date: "Agency Approved / Pending
     //      Start Date".
+    const naturalDefault = classStart ? 'Start Date Confirmed' : DEFAULT_LIFECYCLE
     let lifecycle
     if (existing) {
-      lifecycle = existing.lifecycle_status
+      // Promotion gate: the record looks untouched (still on a stale default
+      // AND last_updated_by is CSV Import) → safe to advance to the new
+      // default. If any OSS has edited it, last_updated_by is the OSS user
+      // and we leave the lifecycle alone.
+      const isPristineDefault =
+        (existing.lifecycle_status === DEFAULT_LIFECYCLE ||
+          existing.lifecycle_status === 'Start Date Confirmed') &&
+        existing.last_updated_by === 'CSV Import' &&
+        existing.lifecycle_status !== naturalDefault
+      lifecycle = isPristineDefault ? naturalDefault : existing.lifecycle_status
     } else if (
       record.lifecycle_status &&
       VALID_LIFECYCLES.has(record.lifecycle_status)
@@ -196,7 +208,7 @@ export function parseStudentsCsv(text, existingStudents = [], options = {}) {
           `Row ${idx + 2}: unknown lifecycle_status "${record.lifecycle_status}" — defaulted.`,
         )
       }
-      lifecycle = classStart ? 'Start Date Confirmed' : DEFAULT_LIFECYCLE
+      lifecycle = naturalDefault
     }
     const location = record.location || (existing?.location ?? '')
     const ossOwner =

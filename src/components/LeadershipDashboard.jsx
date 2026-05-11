@@ -5,7 +5,7 @@ import { fmtMoney, parseLocalDate } from '../utils/format'
 // "Starting in Next 7 Days" KPI to avoid double-counting students who have
 // already started.
 const PRE_START_LIFECYCLE = new Set([
-  'Agency Approved / Pending Start Date',
+  'Agency Approved / Need to Confirm Start Date',
   'Start Date Confirmed',
   'Student Contacted – Awaiting Confirmation',
   'Student Unreachable',
@@ -22,7 +22,7 @@ const COLLECTIBLE_LIFECYCLE = new Set([
 ])
 
 const LIFECYCLE_BAR_COLOR = {
-  'Agency Approved / Pending Start Date': 'bg-slate-400',
+  'Agency Approved / Need to Confirm Start Date': 'bg-slate-400',
   'Start Date Confirmed': 'bg-blue-500',
   'Student Contacted – Awaiting Confirmation': 'bg-sky-500',
   'Student Unreachable': 'bg-red-500',

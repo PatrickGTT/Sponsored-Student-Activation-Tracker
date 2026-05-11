@@ -21,13 +21,27 @@ function safe(fn, fallback) {
   }
 }
 
+// One-off lifecycle rename map. When we change a status name, the existing
+// localStorage data may still carry the old name — this migrates on load so
+// users don't have to reset/re-import.
+const LIFECYCLE_RENAMES = {
+  'Agency Approved / Pending Start Date':
+    'Agency Approved / Need to Confirm Start Date',
+}
+
+function migrateStudent(s) {
+  const renamed = LIFECYCLE_RENAMES[s.lifecycle_status]
+  if (renamed) return { ...s, lifecycle_status: renamed }
+  return s
+}
+
 export function loadStudents(fallback) {
   return safe(() => {
     const raw = localStorage.getItem(STUDENTS_KEY)
     if (!raw) return fallback
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed) || parsed.length === 0) return fallback
-    return parsed
+    return parsed.map(migrateStudent)
   }, fallback)
 }
 

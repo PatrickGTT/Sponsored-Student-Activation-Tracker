@@ -84,19 +84,19 @@ export default function Header({
             Daily Report
           </TabBtn>
           <TabBtn
+            active={view === 'my_students'}
+            onClick={() => onChangeView('my_students')}
+            badge={myStudentsCount}
+          >
+            My Students
+          </TabBtn>
+          <TabBtn
             active={view === 'priority'}
             onClick={() => onChangeView('priority')}
             badge={priorityCount}
             badgeTone="red"
           >
             Priority This Week
-          </TabBtn>
-          <TabBtn
-            active={view === 'my_students'}
-            onClick={() => onChangeView('my_students')}
-            badge={myStudentsCount}
-          >
-            My Students
           </TabBtn>
           <TabBtn active={view === 'all'} onClick={() => onChangeView('all')}>
             All Sponsored Students

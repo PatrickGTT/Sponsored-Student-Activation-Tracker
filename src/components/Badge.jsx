@@ -5,7 +5,7 @@ const RISK_STYLES = {
 }
 
 const STATUS_STYLES = {
-  'Agency Approved / Pending Start Date': 'bg-slate-100 text-slate-700 ring-slate-200',
+  'Agency Approved / Need to Confirm Start Date': 'bg-slate-100 text-slate-700 ring-slate-200',
   'Start Date Confirmed': 'bg-blue-100 text-blue-800 ring-blue-200',
   'Student Contacted – Awaiting Confirmation': 'bg-sky-100 text-sky-800 ring-sky-200',
   'Student Unreachable': 'bg-red-100 text-red-800 ring-red-200',
