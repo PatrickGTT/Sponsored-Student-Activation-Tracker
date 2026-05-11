@@ -19,6 +19,13 @@ import ForecastView from './components/ForecastView'
 import DataToolbar from './components/DataToolbar'
 import DailyReport from './components/DailyReport'
 import HelpPage from './components/HelpPage'
+import {
+  clearStudents,
+  loadCurrentUser,
+  loadStudents,
+  saveCurrentUser,
+  saveStudents,
+} from './utils/storage'
 
 const DEFAULT_FILTERS = {
   oss_owner: 'All',
@@ -30,7 +37,10 @@ const DEFAULT_FILTERS = {
 }
 
 export default function App() {
-  const [students, setStudents] = useState(STUDENTS)
+  // Load persisted students (and current user) from localStorage if present,
+  // otherwise fall back to the bundled mock data. Lets imports survive a
+  // refresh / close-and-reopen during development and demos.
+  const [students, setStudents] = useState(() => loadStudents(STUDENTS))
   const [view, setView] = useState('dashboard')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [selectedId, setSelectedId] = useState(null)
@@ -42,7 +52,15 @@ export default function App() {
       Array.from(new Set(students.map((s) => s.oss_owner).filter(Boolean))).sort(),
     [students],
   )
-  const [currentUser, setCurrentUser] = useState(ossUsers[0] || '')
+  const [currentUser, setCurrentUser] = useState(() => {
+    const initialStudents = loadStudents(STUDENTS)
+    const initialOssUsers = Array.from(
+      new Set(initialStudents.map((s) => s.oss_owner).filter(Boolean)),
+    ).sort()
+    const saved = loadCurrentUser()
+    if (saved && initialOssUsers.includes(saved)) return saved
+    return initialOssUsers[0] || ''
+  })
 
   // If the imported data drops the previously selected user, fall back.
   useEffect(() => {
@@ -50,6 +68,15 @@ export default function App() {
       setCurrentUser(ossUsers[0])
     }
   }, [ossUsers, currentUser])
+
+  // Persist on every change. JSON-serializing 300+ student records is well
+  // under 1 MB so this is fast and well under the localStorage quota.
+  useEffect(() => {
+    saveStudents(students)
+  }, [students])
+  useEffect(() => {
+    saveCurrentUser(currentUser)
+  }, [currentUser])
 
   const enriched = useMemo(
     () =>
@@ -138,6 +165,7 @@ export default function App() {
   }
 
   function handleResetDemo() {
+    clearStudents()
     setStudents(STUDENTS)
     setSelectedId(null)
     setFilters(DEFAULT_FILTERS)
